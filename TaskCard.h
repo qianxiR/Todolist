@@ -5,9 +5,9 @@
 #include <QFrame>
 #include <QPoint>
 
+class QCheckBox;
 class QLabel;
 class QMouseEvent;
-class QPushButton;
 
 class TaskCard final : public QFrame {
     Q_OBJECT
@@ -28,7 +28,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
 
     TodoTask task_;
-    QPushButton *statusButton_ = nullptr;
+    QCheckBox *completionBox_ = nullptr;
     QLabel *titleLabel_ = nullptr;
     QLabel *noteLabel_ = nullptr;
     QPoint dragStartPosition_;

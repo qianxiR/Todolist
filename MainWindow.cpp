@@ -10,10 +10,8 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDialog>
-#include <QDialogButtonBox>
 #include <QDir>
 #include <QFont>
-#include <QFormLayout>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -31,24 +29,18 @@
 #include <algorithm>
 
 namespace {
-struct MatrixCell {
-    TaskQuadrant quadrant;
-    int row;
-    int column;
-};
-
-const std::array<QString, 4> kQuadrantDescriptions = {
+const std::array<QString, 4> kQuadrantActions = {
     QStringLiteral("立即处理"),
-    QStringLiteral("安排时间"),
-    QStringLiteral("可委派处理"),
-    QStringLiteral("降低投入")
+    QStringLiteral("计划安排"),
+    QStringLiteral("委派处理"),
+    QStringLiteral("暂不处理")
 };
 
-const std::array<MatrixCell, 4> kMatrixCells = {{
-    {TaskQuadrant::Schedule, 0, 0},
-    {TaskQuadrant::DoNow, 0, 1},
-    {TaskQuadrant::Eliminate, 1, 0},
-    {TaskQuadrant::Delegate, 1, 1}
+const std::array<TaskQuadrant, 4> kQuadrantOrder = {{
+    TaskQuadrant::Schedule,
+    TaskQuadrant::DoNow,
+    TaskQuadrant::Eliminate,
+    TaskQuadrant::Delegate
 }};
 }
 
@@ -63,50 +55,47 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::createInterface()
 {
-    // 入参：无。方法：组织品牌区、启动项开关及坐标轴式四象限矩阵。出参：无。
+    // 入参：无。方法：组织紧凑工具栏与无坐标轴的四象限任务看板。出参：无。
     setWindowTitle(QStringLiteral("Todolist"));
     setMinimumSize(820, 560);
     resize(920, 630);
 
     auto *central = new QWidget(this);
     auto *root = new QVBoxLayout(central);
-    root->setContentsMargins(22, 18, 22, 20);
-    root->setSpacing(15);
+    root->setContentsMargins(24, 20, 24, 22);
+    root->setSpacing(18);
 
     auto *clockMark = new QLabel(central);
-    clockMark->setPixmap(QIcon(QStringLiteral(":/icons/clock.svg")).pixmap(38, 38));
-    clockMark->setFixedSize(38, 38);
+    clockMark->setPixmap(QIcon(QStringLiteral(":/icons/clock.svg")).pixmap(32, 32));
+    clockMark->setFixedSize(32, 32);
 
-    auto *heading = new QLabel(QStringLiteral("TODOLIST"), central);
+    auto *heading = new QLabel(QStringLiteral("Todolist"), central);
     heading->setObjectName(QStringLiteral("heading"));
     QFont headingFont(QStringLiteral("Microsoft YaHei UI"));
-    headingFont.setPointSize(21);
+    headingFont.setPointSize(18);
     headingFont.setWeight(QFont::DemiBold);
-    headingFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.4);
     heading->setFont(headingFont);
 
-    auto *caption = new QLabel(QStringLiteral("EISENHOWER MATRIX · 让注意力有处可去"), central);
+    auto *caption = new QLabel(QStringLiteral("四象限任务管理"), central);
     caption->setObjectName(QStringLiteral("caption"));
 
     auto *titleStack = new QVBoxLayout;
     titleStack->setContentsMargins(0, 0, 0, 0);
-    titleStack->setSpacing(1);
+    titleStack->setSpacing(0);
     titleStack->addWidget(heading);
     titleStack->addWidget(caption);
 
     auto *brand = new QHBoxLayout;
     brand->setContentsMargins(0, 0, 0, 0);
-    brand->setSpacing(9);
+    brand->setSpacing(10);
     brand->addWidget(clockMark);
     brand->addLayout(titleStack);
 
-    autoStartBox_ = new QCheckBox(QStringLiteral("开机启动"), central);
-    autoStartBox_->setObjectName(QStringLiteral("autoStartBox"));
-    autoStartBox_->setChecked(isAutoStartEnabled());
-    connect(autoStartBox_, &QCheckBox::toggled, this, [this](bool enabled) { setAutoStartEnabled(enabled); });
-    if (autoStartBox_->isChecked()) {
-        setAutoStartEnabled(true);
-    }
+    auto *settingsButton = new QPushButton(QStringLiteral("设置"), central);
+    settingsButton->setObjectName(QStringLiteral("settingsButton"));
+    settingsButton->setToolTip(QStringLiteral("应用设置"));
+    settingsButton->setCursor(Qt::PointingHandCursor);
+    connect(settingsButton, &QPushButton::clicked, this, &MainWindow::openSettings);
 
     auto *addButton = new QPushButton(QStringLiteral("+ 新建任务"), central);
     addButton->setObjectName(QStringLiteral("addButton"));
@@ -114,42 +103,58 @@ void MainWindow::createInterface()
     connect(addButton, &QPushButton::clicked, this, [this] { openTaskEditor(TaskQuadrant::DoNow); });
 
     auto *topBar = new QHBoxLayout;
+    topBar->setContentsMargins(0, 0, 0, 0);
+    topBar->setSpacing(8);
     topBar->addLayout(brand);
     topBar->addStretch();
-    topBar->addWidget(autoStartBox_);
-    topBar->addSpacing(10);
+    topBar->addWidget(settingsButton);
     topBar->addWidget(addButton);
     root->addLayout(topBar);
 
-    auto *matrixFrame = new QFrame(central);
-    matrixFrame->setObjectName(QStringLiteral("matrixFrame"));
-    auto *matrix = new QGridLayout(matrixFrame);
-    matrix->setContentsMargins(1, 1, 1, 1);
-    matrix->setHorizontalSpacing(1);
-    matrix->setVerticalSpacing(1);
+    auto *board = new QWidget(central);
+    auto *matrix = new QGridLayout(board);
+    matrix->setContentsMargins(0, 0, 0, 0);
+    matrix->setHorizontalSpacing(12);
+    matrix->setVerticalSpacing(12);
 
-    auto *importantAxis = new QLabel(QStringLiteral("重\n要\n↑"), matrixFrame);
-    importantAxis->setObjectName(QStringLiteral("importanceAxis"));
-    importantAxis->setAlignment(Qt::AlignCenter);
-    matrix->addWidget(importantAxis, 0, 1);
-
-    auto *notImportantAxis = new QLabel(QStringLiteral("↓\n不\n重\n要"), matrixFrame);
-    notImportantAxis->setObjectName(QStringLiteral("importanceAxis"));
-    notImportantAxis->setAlignment(Qt::AlignCenter);
-    matrix->addWidget(notImportantAxis, 2, 1);
-
-    for (const MatrixCell &cell : kMatrixCells) {
-        const int index = quadrantIndex(cell.quadrant);
-        auto *panel = new QFrame(matrixFrame);
+    for (int position = 0; position < static_cast<int>(kQuadrantOrder.size()); ++position) {
+        const TaskQuadrant quadrant = kQuadrantOrder.at(position);
+        const int index = quadrantIndex(quadrant);
+        auto *panel = new QFrame(board);
         panel->setObjectName(QStringLiteral("quadrantPanel"));
         panel->setProperty("quadrant", index);
 
-        auto *title = new QLabel(quadrantTitle(cell.quadrant), panel);
+        auto *accent = new QFrame(panel);
+        accent->setObjectName(QStringLiteral("quadrantAccent"));
+        accent->setProperty("quadrant", index);
+        accent->setFixedSize(4, 30);
+
+        auto *title = new QLabel(kQuadrantActions.at(index), panel);
         title->setObjectName(QStringLiteral("quadrantTitle"));
-        auto *description = new QLabel(kQuadrantDescriptions.at(index), panel);
+        auto *description = new QLabel(quadrantTitle(quadrant), panel);
         description->setObjectName(QStringLiteral("quadrantDescription"));
 
-        auto *list = new QuadrantListWidget(cell.quadrant, panel);
+        auto *titleStack = new QVBoxLayout;
+        titleStack->setContentsMargins(0, 0, 0, 0);
+        titleStack->setSpacing(1);
+        titleStack->addWidget(title);
+        titleStack->addWidget(description);
+
+        auto *countLabel = new QLabel(QStringLiteral("0"), panel);
+        countLabel->setObjectName(QStringLiteral("quadrantCount"));
+        countLabel->setAlignment(Qt::AlignCenter);
+        countLabel->setFixedSize(28, 22);
+        quadrantCountLabels_.at(index) = countLabel;
+
+        auto *panelHeader = new QHBoxLayout;
+        panelHeader->setContentsMargins(0, 0, 0, 0);
+        panelHeader->setSpacing(9);
+        panelHeader->addWidget(accent);
+        panelHeader->addLayout(titleStack);
+        panelHeader->addStretch();
+        panelHeader->addWidget(countLabel);
+
+        auto *list = new QuadrantListWidget(quadrant, panel);
         list->setObjectName(QStringLiteral("taskList"));
         list->setFrameShape(QFrame::NoFrame);
         list->setSpacing(8);
@@ -160,76 +165,79 @@ void MainWindow::createInterface()
         taskLists_.at(index) = list;
 
         auto *panelLayout = new QVBoxLayout(panel);
-        panelLayout->setContentsMargins(13, 11, 13, 12);
-        panelLayout->setSpacing(3);
-        panelLayout->addWidget(title);
-        panelLayout->addWidget(description);
-        panelLayout->addSpacing(8);
+        panelLayout->setContentsMargins(14, 13, 14, 14);
+        panelLayout->setSpacing(12);
+        panelLayout->addLayout(panelHeader);
         panelLayout->addWidget(list, 1);
-        matrix->addWidget(panel, cell.row * 2, cell.column * 2);
+        matrix->addWidget(panel, position / 2, position % 2);
     }
 
-    auto *notUrgentAxis = new QLabel(QStringLiteral("← 非紧急"), matrixFrame);
-    notUrgentAxis->setObjectName(QStringLiteral("urgencyAxis"));
-    notUrgentAxis->setAlignment(Qt::AlignCenter);
-    auto *urgentAxis = new QLabel(QStringLiteral("紧急 →"), matrixFrame);
-    urgentAxis->setObjectName(QStringLiteral("urgencyAxis"));
-    urgentAxis->setAlignment(Qt::AlignCenter);
-    auto *axisCenter = new QLabel(QStringLiteral("＋"), matrixFrame);
-    axisCenter->setObjectName(QStringLiteral("axisCenter"));
-    axisCenter->setAlignment(Qt::AlignCenter);
-    matrix->addWidget(notUrgentAxis, 1, 0);
-    matrix->addWidget(axisCenter, 1, 1);
-    matrix->addWidget(urgentAxis, 1, 2);
-    matrix->setColumnMinimumWidth(1, 42);
     matrix->setColumnStretch(0, 1);
-    matrix->setColumnStretch(2, 1);
+    matrix->setColumnStretch(1, 1);
     matrix->setRowStretch(0, 1);
-    matrix->setRowStretch(2, 1);
-    root->addWidget(matrixFrame, 1);
+    matrix->setRowStretch(1, 1);
+    root->addWidget(board, 1);
 
     setCentralWidget(central);
     setStyleSheet(QStringLiteral(R"(
         QMainWindow { background: #FFFFFF; font-family: "Microsoft YaHei UI", "Segoe UI"; font-size: 13px; }
-        QLabel#heading { color: #173F52; }
-        QLabel#caption { color: #829BA5; font-size: 11px; font-weight: 600; }
-        QCheckBox#autoStartBox { color: #496875; font-size: 12px; font-weight: 600; spacing: 7px; }
-        QCheckBox#autoStartBox::indicator { width: 17px; height: 17px; border: 1px solid #B7CBD3; border-radius: 4px; background: #FFFFFF; }
-        QCheckBox#autoStartBox::indicator:checked { background: #6FC69B; border-color: #6FC69B; }
-        QPushButton#addButton { background: #4FAFCE; border: 0; border-radius: 7px; color: #FFFFFF; font-size: 12px; font-weight: 600; padding: 8px 13px; }
-        QPushButton#addButton:hover { background: #349BBC; }
-        QFrame#matrixFrame { background: #BCD4DD; border: 1px solid #BCD4DD; border-radius: 10px; }
-        QFrame#quadrantPanel { border: 0; }
-        QFrame#quadrantPanel[quadrant="0"] { background: #E5F6FB; }
-        QFrame#quadrantPanel[quadrant="1"] { background: #ECF8F0; }
-        QFrame#quadrantPanel[quadrant="2"] { background: #F1F6F8; }
-        QFrame#quadrantPanel[quadrant="3"] { background: #F4FAF2; }
-        QLabel#importanceAxis, QLabel#urgencyAxis { background: #F8FCFD; color: #668895; font-size: 11px; font-weight: 600; }
-        QLabel#axisCenter { background: #F8FCFD; color: #60AFC8; font-size: 16px; font-weight: 600; }
-        QLabel#quadrantTitle { color: #214F63; font-size: 14px; font-weight: 600; }
-        QLabel#quadrantDescription { color: #829BA5; font-size: 11px; font-weight: 600; }
+        QLabel#heading { color: #172B35; }
+        QLabel#caption { color: #8A99A1; font-size: 11px; }
+        QPushButton#settingsButton { background: #2F93B4; border: 0; border-radius: 6px; color: #FFFFFF; font-size: 12px; font-weight: 600; padding: 9px 14px; }
+        QPushButton#settingsButton:hover { background: #287F9B; }
+        QPushButton#addButton { background: #2F93B4; border: 0; border-radius: 6px; color: #FFFFFF; font-size: 12px; font-weight: 600; padding: 9px 14px; }
+        QPushButton#addButton:hover { background: #287F9B; }
+        QFrame#quadrantPanel { background: #F7F9FA; border: 1px solid #E2E8EA; border-radius: 8px; }
+        QFrame#quadrantAccent { border: 0; border-radius: 2px; }
+        QFrame#quadrantAccent[quadrant="0"] { background: #DF665B; }
+        QFrame#quadrantAccent[quadrant="1"] { background: #389E78; }
+        QFrame#quadrantAccent[quadrant="2"] { background: #D29335; }
+        QFrame#quadrantAccent[quadrant="3"] { background: #8B98A0; }
+        QLabel#quadrantTitle { color: #233941; font-size: 14px; font-weight: 600; }
+        QLabel#quadrantDescription { color: #8A999F; font-size: 10px; }
+        QLabel#quadrantCount { background: #E9EEF0; border-radius: 11px; color: #65777E; font-size: 11px; font-weight: 600; }
         QListWidget#taskList { background: transparent; outline: 0; }
-        QListWidget#taskList[dropActive="true"] { background: rgba(111, 196, 219, 0.22); border: 1px dashed #5FAFC7; border-radius: 6px; }
+        QListWidget#taskList[dropActive="true"] { background: rgba(47, 147, 180, 0.09); border: 1px dashed #5EA9C0; border-radius: 6px; }
         QListWidget#taskList::item { border: 0; }
-        QScrollBar:vertical { background: #EDF5F7; width: 9px; margin: 5px 2px; border-radius: 4px; }
-        QScrollBar::handle:vertical { background: #9CCBD9; min-height: 34px; border-radius: 4px; }
-        QScrollBar::handle:vertical:hover { background: #60B2CA; }
+        QScrollBar:vertical { background: transparent; width: 8px; margin: 4px 1px; }
+        QScrollBar::handle:vertical { background: #C8D2D6; min-height: 34px; border-radius: 4px; }
+        QScrollBar::handle:vertical:hover { background: #AAB9BF; }
         QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
         QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
-        QFrame#taskCard { background: #FFFFFF; border: 1px solid #D7E7EA; border-radius: 7px; }
-        QFrame#taskCard[completed="true"] { background: #F0FAF4; border-color: #BDE5CD; }
-        QFrame#taskCard:hover { border-color: #84C6D9; }
-        QLabel#taskTitle { color: #294B58; font-size: 13px; font-weight: 600; }
-        QLabel#noteLabel { color: #73969A; font-size: 11px; font-weight: 600; }
-        QPushButton#statusButton { border: 0; border-radius: 5px; font-size: 11px; font-weight: 600; min-width: 52px; padding: 5px 7px; }
-        QPushButton#statusButton[completed="false"] { background: #E5F3F8; color: #36748A; }
-        QPushButton#statusButton[completed="true"] { background: #DDF3E6; color: #327851; }
-        QPushButton#statusButton:hover { background: #CFEAF3; }
-        QToolButton { border: 0; border-radius: 4px; color: #557884; padding: 4px; }
-        QToolButton:hover { background: #E0F2F7; }
+        QFrame#taskCard { background: #FFFFFF; border: 1px solid #E1E7E9; border-radius: 6px; }
+        QFrame#taskCard[completed="true"] { background: #F8FAFA; }
+        QFrame#taskCard:hover { border-color: #AABBC1; }
+        QLabel#taskTitle { color: #263C44; font-size: 13px; font-weight: 600; }
+        QLabel#noteLabel { color: #829198; font-size: 11px; }
+        QCheckBox#completionBox { spacing: 0; }
+        QCheckBox#completionBox::indicator { width: 17px; height: 17px; border: 1px solid #AEBCC1; border-radius: 5px; background: #FFFFFF; }
+        QCheckBox#completionBox::indicator:hover { border-color: #2F93B4; }
+        QCheckBox#completionBox::indicator:checked { background: #389E78; border-color: #389E78; }
+        QToolButton#moreButton { border: 0; border-radius: 4px; color: #73848B; font-size: 12px; font-weight: 600; padding: 3px 5px; }
+        QToolButton#moreButton:hover { background: #EDF2F3; color: #314850; }
+        QToolButton#moreButton::menu-indicator { image: none; width: 0; }
+        QMenu { background: #FFFFFF; border: 1px solid #DCE4E7; border-radius: 6px; padding: 5px; }
+        QMenu::item { border-radius: 4px; color: #344A52; padding: 7px 26px 7px 10px; }
+        QMenu::item:selected { background: #EDF4F6; }
+        QMenu::indicator { width: 14px; height: 14px; }
         QDialog { background: #FFFFFF; }
-        QLineEdit, QTextEdit, QComboBox { background: #FFFFFF; border: 1px solid #C5D8DE; border-radius: 5px; min-height: 27px; padding: 2px 7px; }
-        QDialogButtonBox QPushButton { background: #4FAFCE; border: 0; border-radius: 5px; color: #FFFFFF; min-width: 78px; padding: 7px 10px; }
+        QLabel#dialogTitle { color: #1F353E; font-size: 17px; font-weight: 600; }
+        QLabel#dialogSubtitle { color: #87969C; font-size: 11px; }
+        QLabel#fieldLabel { color: #40555D; font-size: 12px; font-weight: 600; }
+        QLabel#settingDescription { color: #87969C; font-size: 11px; }
+        QFrame#dialogDivider { background: #E7ECEE; border: 0; max-height: 1px; }
+        QLineEdit, QTextEdit, QComboBox { background: #FFFFFF; border: 1px solid #CBD6DA; border-radius: 6px; color: #263C44; padding: 5px 9px; selection-background-color: #74B5CA; }
+        QLineEdit:focus, QTextEdit:focus, QComboBox:focus { border-color: #2F93B4; }
+        QLineEdit { min-height: 28px; }
+        QComboBox { min-height: 28px; }
+        QCheckBox#completionEditor { color: #40555D; spacing: 8px; }
+        QCheckBox#completionEditor::indicator { width: 17px; height: 17px; border: 1px solid #AEBCC1; border-radius: 5px; background: #FFFFFF; }
+        QCheckBox#completionEditor::indicator:checked { background: #389E78; border-color: #389E78; }
+        QPushButton#dialogPrimary { background: #2F93B4; border: 0; border-radius: 6px; color: #FFFFFF; font-weight: 600; min-width: 86px; padding: 9px 14px; }
+        QPushButton#dialogPrimary:hover { background: #287F9B; }
+        QPushButton#dialogPrimary:disabled { background: #B7CDD5; }
+        QPushButton#dialogSecondary { background: #FFFFFF; border: 1px solid #D4DEE1; border-radius: 6px; color: #4A5E66; min-width: 78px; padding: 8px 13px; }
+        QPushButton#dialogSecondary:hover { background: #F3F6F7; }
     )"));
 }
 
@@ -259,29 +267,53 @@ void MainWindow::createTrayIcon()
 
 void MainWindow::refreshTaskLists()
 {
-    // 入参：无。方法：清空四个列表后按任务象限重建卡片。出参：无。
+    // 入参：无。方法：按任务象限重建紧凑卡片并同步各象限计数。出参：无。
     for (QListWidget *list : taskLists_) {
         list->clear();
     }
 
+    std::array<int, 4> quadrantCounts{};
     for (const TodoTask &task : tasks_) {
-        QListWidget *list = taskLists_.at(quadrantIndex(task.quadrant));
+        const int index = quadrantIndex(task.quadrant);
+        QListWidget *list = taskLists_.at(index);
         auto *item = new QListWidgetItem(list);
-        item->setSizeHint(QSize(0, 70));
+        item->setSizeHint(QSize(0, task.note.trimmed().isEmpty() ? 48 : 64));
         auto *card = new TaskCard(task, list);
         list->setItemWidget(item, card);
+        ++quadrantCounts.at(index);
         connect(card, &TaskCard::taskUpdated, this, [this](const TodoTask &updated) { replaceTask(updated); });
         connect(card, &TaskCard::editRequested, this, [this](const TodoTask &selected) { openTaskEditor(selected.quadrant, &selected); });
         connect(card, &TaskCard::removeRequested, this, [this](const QString &id) { removeTask(id); });
+    }
+
+    for (int index = 0; index < static_cast<int>(quadrantCountLabels_.size()); ++index) {
+        quadrantCountLabels_.at(index)->setText(QString::number(quadrantCounts.at(index)));
     }
 }
 
 void MainWindow::openTaskEditor(TaskQuadrant initialQuadrant, const TodoTask *existingTask)
 {
-    // 入参：默认象限及可选既有任务。方法：展示任务表单并保存用户确认的改动。出参：无。
+    // 入参：默认象限及可选既有任务。方法：展示与主界面同主题的任务表单并保存确认改动。出参：无。
     QDialog dialog(this);
     dialog.setWindowTitle(existingTask == nullptr ? QStringLiteral("新建任务") : QStringLiteral("编辑任务"));
-    dialog.setMinimumWidth(360);
+    dialog.setMinimumWidth(420);
+
+    auto *dialogTitle = new QLabel(existingTask == nullptr ? QStringLiteral("新建任务") : QStringLiteral("编辑任务"), &dialog);
+    dialogTitle->setObjectName(QStringLiteral("dialogTitle"));
+    auto *dialogSubtitle = new QLabel(
+        existingTask == nullptr ? QStringLiteral("记录事项，并放入合适的优先级象限") : QStringLiteral("调整任务内容、象限或完成状态"),
+        &dialog);
+    dialogSubtitle->setObjectName(QStringLiteral("dialogSubtitle"));
+
+    auto *dialogHeader = new QVBoxLayout;
+    dialogHeader->setContentsMargins(0, 0, 0, 0);
+    dialogHeader->setSpacing(3);
+    dialogHeader->addWidget(dialogTitle);
+    dialogHeader->addWidget(dialogSubtitle);
+
+    auto *divider = new QFrame(&dialog);
+    divider->setObjectName(QStringLiteral("dialogDivider"));
+    divider->setFixedHeight(1);
 
     auto *titleEdit = new QLineEdit(&dialog);
     titleEdit->setPlaceholderText(QStringLiteral("输入待办事项"));
@@ -290,7 +322,7 @@ void MainWindow::openTaskEditor(TaskQuadrant initialQuadrant, const TodoTask *ex
     auto *noteEdit = new QTextEdit(&dialog);
     noteEdit->setPlaceholderText(QStringLiteral("输入备注（可选）"));
     noteEdit->setPlainText(existingTask == nullptr ? QString() : existingTask->note);
-    noteEdit->setFixedHeight(76);
+    noteEdit->setFixedHeight(88);
 
     auto *quadrantBox = new QComboBox(&dialog);
     for (int index = 0; index < 4; ++index) {
@@ -298,27 +330,58 @@ void MainWindow::openTaskEditor(TaskQuadrant initialQuadrant, const TodoTask *ex
     }
     quadrantBox->setCurrentIndex(existingTask == nullptr ? quadrantIndex(initialQuadrant) : quadrantIndex(existingTask->quadrant));
 
-    auto *completionBox = new QComboBox(&dialog);
-    completionBox->addItem(QStringLiteral("待完成"), false);
-    completionBox->addItem(QStringLiteral("已完成"), true);
-    completionBox->setCurrentIndex(existingTask != nullptr && existingTask->completed ? 1 : 0);
+    auto *completionBox = new QCheckBox(QStringLiteral("标记为已完成"), &dialog);
+    completionBox->setObjectName(QStringLiteral("completionEditor"));
+    completionBox->setChecked(existingTask != nullptr && existingTask->completed);
 
-    auto *form = new QFormLayout;
-    form->setSpacing(12);
-    form->addRow(QStringLiteral("事项"), titleEdit);
-    form->addRow(QStringLiteral("备注"), noteEdit);
-    form->addRow(QStringLiteral("四象限"), quadrantBox);
-    form->addRow(QStringLiteral("完成状态"), completionBox);
+    auto *titleLabel = new QLabel(QStringLiteral("事项"), &dialog);
+    titleLabel->setObjectName(QStringLiteral("fieldLabel"));
+    auto *noteLabel = new QLabel(QStringLiteral("备注"), &dialog);
+    noteLabel->setObjectName(QStringLiteral("fieldLabel"));
+    auto *quadrantLabel = new QLabel(QStringLiteral("所属象限"), &dialog);
+    quadrantLabel->setObjectName(QStringLiteral("fieldLabel"));
 
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
-    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    auto *form = new QVBoxLayout;
+    form->setContentsMargins(0, 0, 0, 0);
+    form->setSpacing(7);
+    form->addWidget(titleLabel);
+    form->addWidget(titleEdit);
+    form->addSpacing(4);
+    form->addWidget(noteLabel);
+    form->addWidget(noteEdit);
+    form->addSpacing(4);
+    form->addWidget(quadrantLabel);
+    form->addWidget(quadrantBox);
+    form->addSpacing(4);
+    form->addWidget(completionBox);
+
+    auto *cancelButton = new QPushButton(QStringLiteral("取消"), &dialog);
+    cancelButton->setObjectName(QStringLiteral("dialogSecondary"));
+    auto *saveButton = new QPushButton(existingTask == nullptr ? QStringLiteral("创建任务") : QStringLiteral("保存修改"), &dialog);
+    saveButton->setObjectName(QStringLiteral("dialogPrimary"));
+    saveButton->setDefault(true);
+    saveButton->setEnabled(!titleEdit->text().trimmed().isEmpty());
+
+    auto *buttons = new QHBoxLayout;
+    buttons->setContentsMargins(0, 0, 0, 0);
+    buttons->setSpacing(8);
+    buttons->addStretch();
+    buttons->addWidget(cancelButton);
+    buttons->addWidget(saveButton);
+
+    connect(cancelButton, &QPushButton::clicked, &dialog, &QDialog::reject);
+    connect(saveButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+    connect(titleEdit, &QLineEdit::textChanged, saveButton, [saveButton](const QString &text) {
+        saveButton->setEnabled(!text.trimmed().isEmpty());
+    });
 
     auto *layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(22, 20, 22, 20);
-    layout->setSpacing(18);
+    layout->setContentsMargins(24, 22, 24, 22);
+    layout->setSpacing(16);
+    layout->addLayout(dialogHeader);
+    layout->addWidget(divider);
     layout->addLayout(form);
-    layout->addWidget(buttons);
+    layout->addLayout(buttons);
 
     if (dialog.exec() != QDialog::Accepted || titleEdit->text().trimmed().isEmpty()) {
         return;
@@ -330,7 +393,7 @@ void MainWindow::openTaskEditor(TaskQuadrant initialQuadrant, const TodoTask *ex
     task.title = titleEdit->text().trimmed();
     task.note = noteEdit->toPlainText().trimmed();
     task.quadrant = quadrantFromIndex(quadrantBox->currentIndex());
-    task.completed = completionBox->currentData().toBool();
+    task.completed = completionBox->isChecked();
 
     if (existingTask == nullptr) {
         tasks_.append(task);
@@ -340,6 +403,80 @@ void MainWindow::openTaskEditor(TaskQuadrant initialQuadrant, const TodoTask *ex
     }
     saveTasks();
     refreshTaskLists();
+}
+
+void MainWindow::openSettings()
+{
+    // 入参：无。方法：使用统一主题弹窗编辑应用级设置，并在确认后持久化。出参：无。
+    QDialog dialog(this);
+    dialog.setWindowTitle(QStringLiteral("设置"));
+    dialog.setMinimumWidth(420);
+
+    auto *dialogTitle = new QLabel(QStringLiteral("设置"), &dialog);
+    dialogTitle->setObjectName(QStringLiteral("dialogTitle"));
+    auto *dialogSubtitle = new QLabel(QStringLiteral("管理 Todolist 的运行方式"), &dialog);
+    dialogSubtitle->setObjectName(QStringLiteral("dialogSubtitle"));
+
+    auto *dialogHeader = new QVBoxLayout;
+    dialogHeader->setContentsMargins(0, 0, 0, 0);
+    dialogHeader->setSpacing(3);
+    dialogHeader->addWidget(dialogTitle);
+    dialogHeader->addWidget(dialogSubtitle);
+
+    auto *divider = new QFrame(&dialog);
+    divider->setObjectName(QStringLiteral("dialogDivider"));
+    divider->setFixedHeight(1);
+
+    auto *settingTitle = new QLabel(QStringLiteral("开机启动"), &dialog);
+    settingTitle->setObjectName(QStringLiteral("fieldLabel"));
+    auto *settingDescription = new QLabel(QStringLiteral("登录 Windows 后自动运行 Todolist"), &dialog);
+    settingDescription->setObjectName(QStringLiteral("settingDescription"));
+
+    auto *settingText = new QVBoxLayout;
+    settingText->setContentsMargins(0, 0, 0, 0);
+    settingText->setSpacing(3);
+    settingText->addWidget(settingTitle);
+    settingText->addWidget(settingDescription);
+
+    auto *autoStartBox = new QCheckBox(QStringLiteral("启用"), &dialog);
+    autoStartBox->setObjectName(QStringLiteral("completionEditor"));
+    autoStartBox->setChecked(isAutoStartEnabled());
+
+    auto *settingRow = new QHBoxLayout;
+    settingRow->setContentsMargins(0, 2, 0, 2);
+    settingRow->setSpacing(16);
+    settingRow->addLayout(settingText, 1);
+    settingRow->addWidget(autoStartBox, 0, Qt::AlignVCenter);
+
+    auto *cancelButton = new QPushButton(QStringLiteral("取消"), &dialog);
+    cancelButton->setObjectName(QStringLiteral("dialogSecondary"));
+    auto *saveButton = new QPushButton(QStringLiteral("保存设置"), &dialog);
+    saveButton->setObjectName(QStringLiteral("dialogPrimary"));
+    saveButton->setDefault(true);
+
+    auto *buttons = new QHBoxLayout;
+    buttons->setContentsMargins(0, 0, 0, 0);
+    buttons->setSpacing(8);
+    buttons->addStretch();
+    buttons->addWidget(cancelButton);
+    buttons->addWidget(saveButton);
+
+    connect(cancelButton, &QPushButton::clicked, &dialog, &QDialog::reject);
+    connect(saveButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+
+    auto *layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(24, 22, 24, 22);
+    layout->setSpacing(18);
+    layout->addLayout(dialogHeader);
+    layout->addWidget(divider);
+    layout->addLayout(settingRow);
+    layout->addSpacing(4);
+    layout->addLayout(buttons);
+
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+    setAutoStartEnabled(autoStartBox->isChecked());
 }
 
 void MainWindow::replaceTask(const TodoTask &task)

@@ -1,12 +1,14 @@
 #include "TaskCard.h"
 
 #include <QApplication>
+#include <QAction>
+#include <QCheckBox>
 #include <QDrag>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
-#include <QPushButton>
 #include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -28,44 +30,43 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
     noteLabel_->setWordWrap(true);
     noteLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
 
-    statusButton_ = new QPushButton(this);
-    statusButton_->setObjectName(QStringLiteral("statusButton"));
-    statusButton_->setCursor(Qt::PointingHandCursor);
+    completionBox_ = new QCheckBox(this);
+    completionBox_->setObjectName(QStringLiteral("completionBox"));
+    completionBox_->setCursor(Qt::PointingHandCursor);
+    completionBox_->setToolTip(QStringLiteral("标记为完成"));
 
-    auto *editButton = new QToolButton(this);
-    editButton->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
-    editButton->setToolTip(QStringLiteral("编辑任务"));
+    auto *moreButton = new QToolButton(this);
+    moreButton->setObjectName(QStringLiteral("moreButton"));
+    moreButton->setText(QStringLiteral("•••"));
+    moreButton->setToolTip(QStringLiteral("更多操作"));
+    moreButton->setPopupMode(QToolButton::InstantPopup);
+    moreButton->setCursor(Qt::PointingHandCursor);
 
-    auto *removeButton = new QToolButton(this);
-    removeButton->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
-    removeButton->setToolTip(QStringLiteral("删除任务"));
-
-    auto *actions = new QHBoxLayout;
-    actions->setContentsMargins(0, 0, 0, 0);
-    actions->setSpacing(2);
-    actions->addWidget(statusButton_);
-    actions->addWidget(editButton);
-    actions->addWidget(removeButton);
+    auto *menu = new QMenu(moreButton);
+    QAction *editAction = menu->addAction(QStringLiteral("编辑任务"));
+    QAction *removeAction = menu->addAction(QStringLiteral("删除任务"));
+    moreButton->setMenu(menu);
 
     auto *content = new QVBoxLayout;
     content->setContentsMargins(0, 0, 0, 0);
-    content->setSpacing(2);
+    content->setSpacing(3);
     content->addWidget(titleLabel_);
     content->addWidget(noteLabel_);
 
     auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(10, 7, 7, 7);
-    layout->setSpacing(8);
+    layout->setContentsMargins(12, 8, 8, 8);
+    layout->setSpacing(10);
+    layout->addWidget(completionBox_, 0, Qt::AlignVCenter);
     layout->addLayout(content, 1);
-    layout->addLayout(actions, 0);
+    layout->addWidget(moreButton, 0, Qt::AlignTop);
 
-    connect(statusButton_, &QPushButton::clicked, this, [this] {
-        task_.completed = !task_.completed;
+    connect(completionBox_, &QCheckBox::toggled, this, [this](bool completed) {
+        task_.completed = completed;
         updateAppearance();
         emit taskUpdated(task_);
     });
-    connect(editButton, &QToolButton::clicked, this, [this] { emit editRequested(task_); });
-    connect(removeButton, &QToolButton::clicked, this, [this] { emit removeRequested(task_.id); });
+    connect(editAction, &QAction::triggered, this, [this] { emit editRequested(task_); });
+    connect(removeAction, &QAction::triggered, this, [this] { emit removeRequested(task_.id); });
 
     updateAppearance();
 }
@@ -104,12 +105,14 @@ void TaskCard::updateAppearance()
     titleFont.setStrikeOut(task_.completed);
     titleLabel_->setFont(titleFont);
     titleLabel_->setText(task_.title);
-    noteLabel_->setText(task_.note.trimmed().isEmpty() ? QStringLiteral("暂无备注") : QStringLiteral("备注：%1").arg(task_.note));
-    statusButton_->setText(task_.completed ? QStringLiteral("已完成") : QStringLiteral("待完成"));
-    statusButton_->setProperty("completed", task_.completed);
+    const QString note = task_.note.trimmed();
+    noteLabel_->setVisible(!note.isEmpty());
+    noteLabel_->setText(note);
+    completionBox_->blockSignals(true);
+    completionBox_->setChecked(task_.completed);
+    completionBox_->blockSignals(false);
+    completionBox_->setToolTip(task_.completed ? QStringLiteral("标记为待完成") : QStringLiteral("标记为完成"));
     setProperty("completed", task_.completed);
-    style()->unpolish(statusButton_);
-    style()->polish(statusButton_);
     style()->unpolish(this);
     style()->polish(this);
 }

@@ -6,8 +6,8 @@
 
 #include <array>
 
-class QCheckBox;
 class QCloseEvent;
+class QLabel;
 class QSystemTrayIcon;
 class QuadrantListWidget;
 
@@ -22,6 +22,7 @@ private:
     void createTrayIcon();
     void refreshTaskLists();
     void openTaskEditor(TaskQuadrant initialQuadrant, const TodoTask *existingTask = nullptr);
+    void openSettings();
     void replaceTask(const TodoTask &task);
     void moveTask(const QString &taskId, TaskQuadrant targetQuadrant, int targetRow);
     void removeTask(const QString &taskId);
@@ -34,8 +35,8 @@ private:
     TodoStorage storage_;
     QVector<TodoTask> tasks_;
     std::array<QuadrantListWidget *, 4> taskLists_{};
+    std::array<QLabel *, 4> quadrantCountLabels_{};
     QSystemTrayIcon *trayIcon_ = nullptr;
-    QCheckBox *autoStartBox_ = nullptr;
     bool hasShownTrayHint_ = false;
     bool isExplicitExit_ = false;
 };
