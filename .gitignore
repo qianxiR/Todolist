@@ -1,0 +1,10 @@
+.qmake.stash
+Makefile*
+debug/
+release/
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.res
+*_resource.rc

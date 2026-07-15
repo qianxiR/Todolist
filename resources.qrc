@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="clock.svg">resources/clock.svg</file>
+    </qresource>
+</RCC>
