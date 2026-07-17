@@ -14,7 +14,6 @@
 #include <QDialog>
 #include <QDir>
 #include <QFont>
-#include <QFontMetrics>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -45,27 +44,6 @@ const std::array<TaskQuadrant, 4> kQuadrantOrder = {{
     TaskQuadrant::Delegate
 }};
 
-int wrappedTextHeight(const QFontMetrics &fontMetrics, const QString &text)
-{
-    // 入参：文本字体度量与待显示内容。方法：按最小窗口下的可用卡片宽度计算换行高度。出参：保证完整显示所需的像素高度。
-    constexpr int kCardTextWidth = 300;
-    return fontMetrics.boundingRect(QRect(0, 0, kCardTextWidth, 0), Qt::TextWordWrap, text).height();
-}
-
-int taskCardHeight(const TodoTask &task)
-{
-    // 入参：待显示任务。方法：累计任务和全部计划的换行高度及布局间距。出参：列表项容纳完整文字所需的高度。
-    const QFontMetrics titleMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 10, QFont::DemiBold));
-    const QFontMetrics planMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 8));
-    int height = 16 + qMax(17, wrappedTextHeight(titleMetrics, task.title));
-    if (!task.plans.isEmpty()) {
-        height += 4 + 14;
-        for (const TodoPlan &plan : task.plans) {
-            height += 2 + qMax(13, wrappedTextHeight(planMetrics, plan.title));
-        }
-    }
-    return height + 8;
-}
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -81,13 +59,13 @@ void MainWindow::createInterface()
 {
     // 入参：无。方法：组织紧凑工具栏与无坐标轴的四象限任务看板。出参：无。
     setWindowTitle(QStringLiteral("Todolist"));
-    setMinimumSize(820, 560);
-    resize(920, 630);
+    setMinimumSize(784, 490);
+    resize(1008, 630);
 
     auto *central = new QWidget(this);
     auto *root = new QVBoxLayout(central);
-    root->setContentsMargins(24, 20, 24, 22);
-    root->setSpacing(18);
+    root->setContentsMargins(20, 12, 20, 16);
+    root->setSpacing(10);
 
     auto *clockMark = new QLabel(central);
     clockMark->setPixmap(QIcon(QStringLiteral(":/icons/clock.svg")).pixmap(32, 32));
@@ -242,7 +220,7 @@ void MainWindow::refreshTaskLists()
         const int index = quadrantIndex(task.quadrant);
         QListWidget *list = taskLists_.at(index);
         auto *item = new QListWidgetItem(list);
-        item->setSizeHint(QSize(0, taskCardHeight(task)));
+        item->setSizeHint(QSize(0, TaskCard::displayHeight(task)));
         auto *card = new TaskCard(task, list);
         list->setItemWidget(item, card);
         ++quadrantCounts.at(index);

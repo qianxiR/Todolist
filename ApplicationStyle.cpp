@@ -4,7 +4,7 @@ QString applicationStyleSheet()
 {
     // 入参：无。方法：集中定义主窗口与任务编辑界面的视觉层级和交互状态。出参：可直接应用到主窗口的 Qt 样式表。
     return QStringLiteral(R"(
-        QMainWindow { background: #FFFFFF; font-family: "Microsoft YaHei UI", "Segoe UI"; font-size: 13px; }
+        QMainWindow { background: #F7F9FC; font-family: "STZhongsong", "Times New Roman"; font-size: 12px; }
         QLabel#heading { color: #172B35; }
         QLabel#caption { color: #8A99A1; font-size: 11px; }
         QPushButton#settingsButton, QPushButton#addButton { background: #2F93B4; border: 0; border-radius: 6px; color: #FFFFFF; font-size: 12px; font-weight: 600; padding: 9px 14px; }

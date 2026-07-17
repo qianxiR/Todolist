@@ -4,6 +4,7 @@
 #include <QAction>
 #include <QCheckBox>
 #include <QDrag>
+#include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
@@ -83,6 +84,23 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
     });
 
     updateAppearance();
+}
+
+int TaskCard::displayHeight(const TodoTask &task)
+{
+    // 入参：待显示任务。方法：按最小看板宽度累计任务与计划文本的换行高度。出参：列表项容纳完整卡片所需高度。
+    constexpr int kCardTextWidth = 300;
+    const auto textHeight = [kCardTextWidth](const QFontMetrics &metrics, const QString &text) {
+        return metrics.boundingRect(QRect(0, 0, kCardTextWidth, 0), Qt::TextWordWrap, text).height();
+    };
+    const QFontMetrics titleMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 10, QFont::DemiBold));
+    const QFontMetrics planMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 8));
+    int height = 16 + qMax(17, textHeight(titleMetrics, task.title));
+    if (!task.plans.isEmpty()) {
+        height += 18;
+        for (const TodoPlan &plan : task.plans) height += 2 + qMax(13, textHeight(planMetrics, plan.title));
+    }
+    return height + 8;
 }
 
 void TaskCard::mousePressEvent(QMouseEvent *event)

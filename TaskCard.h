@@ -15,6 +15,7 @@ class TaskCard final : public QFrame {
 
 public:
     explicit TaskCard(const TodoTask &task, QWidget *parent = nullptr);
+    static int displayHeight(const TodoTask &task);
 
 signals:
     void taskUpdated(const TodoTask &task);
