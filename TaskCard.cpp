@@ -1,15 +1,16 @@
 #include "TaskCard.h"
 
 #include <QApplication>
-#include <QAction>
 #include <QCheckBox>
 #include <QDrag>
 #include <QFontMetrics>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
-#include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
+#include <QMessageBox>
+#include <QPushButton>
 #include <QStyle>
 #include <QToolButton>
 #include <QTimer>
@@ -42,31 +43,39 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
     completionBox_->setCursor(Qt::PointingHandCursor);
     completionBox_->setToolTip(QStringLiteral("标记为完成"));
 
-    auto *moreButton = new QToolButton(this);
-    moreButton->setObjectName(QStringLiteral("moreButton"));
-    moreButton->setText(QStringLiteral("•••"));
-    moreButton->setToolTip(QStringLiteral("更多操作"));
-    moreButton->setPopupMode(QToolButton::InstantPopup);
-    moreButton->setCursor(Qt::PointingHandCursor);
+    auto *editButton = new QToolButton(this);
+    editButton->setObjectName(QStringLiteral("editTaskButton"));
+    editButton->setIcon(QIcon(QStringLiteral(":/icons/edit.svg")));
+    editButton->setIconSize(QSize(16, 16));
+    editButton->setToolTip(QStringLiteral("编辑任务"));
+    editButton->setCursor(Qt::PointingHandCursor);
 
-    auto *menu = new QMenu(moreButton);
-    QAction *editAction = menu->addAction(QStringLiteral("编辑任务"));
-    QAction *removeAction = menu->addAction(QStringLiteral("删除任务"));
-    moreButton->setMenu(menu);
+    auto *removeButton = new QToolButton(this);
+    removeButton->setObjectName(QStringLiteral("removeTaskButton"));
+    removeButton->setIcon(QIcon(QStringLiteral(":/icons/delete.svg")));
+    removeButton->setIconSize(QSize(16, 16));
+    removeButton->setToolTip(QStringLiteral("删除任务"));
+    removeButton->setCursor(Qt::PointingHandCursor);
+
+    auto *header = new QHBoxLayout;
+    header->setContentsMargins(0, 0, 0, 0);
+    header->setSpacing(8);
+    header->addWidget(completionBox_, 0, Qt::AlignTop);
+    header->addWidget(titleLabel_, 1, Qt::AlignTop);
+    header->addWidget(editButton, 0, Qt::AlignTop);
+    header->addWidget(removeButton, 0, Qt::AlignTop);
 
     auto *content = new QVBoxLayout;
     content->setContentsMargins(0, 0, 0, 0);
     content->setSpacing(4);
-    content->addWidget(titleLabel_);
+    content->addLayout(header);
     content->addWidget(planSummaryLabel_);
     content->addWidget(plans);
+    content->addStretch(1);
 
-    auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(12, 8, 8, 8);
-    layout->setSpacing(10);
-    layout->addWidget(completionBox_, 0, Qt::AlignTop);
-    layout->addLayout(content, 1);
-    layout->addWidget(moreButton, 0, Qt::AlignTop);
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(12, 8, 12, 8);
+    layout->addLayout(content);
 
     connect(completionBox_, &QCheckBox::toggled, this, [this](bool completed) {
         task_.completed = completed;
@@ -76,10 +85,22 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
             emit taskUpdated(task_);
         });
     });
-    connect(editAction, &QAction::triggered, this, [this] {
+    connect(editButton, &QToolButton::clicked, this, [this] {
         QTimer::singleShot(0, this, [this] { emit editRequested(task_); });
     });
-    connect(removeAction, &QAction::triggered, this, [this] {
+    connect(removeButton, &QToolButton::clicked, this, [this] {
+        QMessageBox confirmation(this);
+        confirmation.setIcon(QMessageBox::Warning);
+        confirmation.setWindowTitle(QStringLiteral("确认删除"));
+        confirmation.setText(QStringLiteral("确认删除任务“%1”？").arg(task_.title));
+        confirmation.setInformativeText(QStringLiteral("删除后将无法恢复。"));
+        auto *cancelButton = confirmation.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
+        auto *confirmButton = confirmation.addButton(QStringLiteral("删除"), QMessageBox::DestructiveRole);
+        confirmation.setDefaultButton(cancelButton);
+        confirmation.exec();
+        if (confirmation.clickedButton() != confirmButton) {
+            return;
+        }
         QTimer::singleShot(0, this, [this] { emit removeRequested(task_.id); });
     });
 
@@ -89,18 +110,18 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
 int TaskCard::displayHeight(const TodoTask &task)
 {
     // 入参：待显示任务。方法：按最小看板宽度累计任务与计划文本的换行高度。出参：列表项容纳完整卡片所需高度。
-    constexpr int kCardTextWidth = 300;
+    constexpr int kCardTextWidth = 255;
     const auto textHeight = [kCardTextWidth](const QFontMetrics &metrics, const QString &text) {
         return metrics.boundingRect(QRect(0, 0, kCardTextWidth, 0), Qt::TextWordWrap, text).height();
     };
     const QFontMetrics titleMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 10, QFont::DemiBold));
-    const QFontMetrics planMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 8));
+    const QFontMetrics planMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 9));
     int height = 16 + qMax(17, textHeight(titleMetrics, task.title));
     if (!task.plans.isEmpty()) {
         height += 18;
         for (const TodoPlan &plan : task.plans) height += 2 + qMax(13, textHeight(planMetrics, plan.title));
     }
-    return height + 8;
+    return height + 16;
 }
 
 void TaskCard::mousePressEvent(QMouseEvent *event)
@@ -178,6 +199,7 @@ void TaskCard::updateAppearance()
         });
         planLayout_->addWidget(planRow);
     }
+    planLayout_->addStretch(1);
     planSummaryLabel_->setVisible(!task_.plans.isEmpty());
     planSummaryLabel_->setText(QStringLiteral("计划 %1/%2 已完成").arg(completedPlans).arg(task_.plans.size()));
     completionBox_->blockSignals(true);

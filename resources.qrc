@@ -1,5 +1,7 @@
 <RCC>
     <qresource prefix="/icons">
         <file alias="clock.svg">resources/clock.svg</file>
+        <file alias="edit.svg">resources/edit.svg</file>
+        <file alias="delete.svg">resources/delete.svg</file>
     </qresource>
 </RCC>

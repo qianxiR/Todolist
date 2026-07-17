@@ -32,19 +32,16 @@ QString applicationStyleSheet()
         QLabel#taskTitle { color: #263C44; font-size: 13px; font-weight: 600; }
         QLabel#planSummary { color: #829198; font-size: 10px; }
         QWidget#planRow { background: transparent; }
-        QLabel#planTitle { color: #61737B; font-size: 11px; }
+        QLabel#planTitle { color: #61737B; font-size: 12px; }
         QCheckBox#completionBox { spacing: 0; }
         QCheckBox#completionBox::indicator { width: 17px; height: 17px; border: 1px solid #AEBCC1; border-radius: 5px; background: #FFFFFF; }
         QCheckBox#completionBox::indicator:hover { border-color: #2F93B4; }
         QCheckBox#completionBox::indicator:checked, QCheckBox#planCompletionBox::indicator:checked { background: #389E78; border-color: #389E78; }
         QCheckBox#planCompletionBox { color: #61737B; font-size: 11px; spacing: 6px; }
         QCheckBox#planCompletionBox::indicator { width: 13px; height: 13px; border: 1px solid #B8C5C9; border-radius: 4px; background: #FFFFFF; }
-        QToolButton#moreButton { border: 0; border-radius: 4px; color: #73848B; font-size: 12px; font-weight: 600; padding: 3px 5px; }
-        QToolButton#moreButton:hover { background: #EDF2F3; color: #314850; }
-        QToolButton#moreButton::menu-indicator { image: none; width: 0; }
-        QMenu { background: #FFFFFF; border: 1px solid #DCE4E7; border-radius: 6px; padding: 5px; }
-        QMenu::item { border-radius: 4px; color: #344A52; padding: 7px 26px 7px 10px; }
-        QMenu::item:selected { background: #EDF4F6; }
+        QToolButton#editTaskButton, QToolButton#removeTaskButton { border: 0; border-radius: 4px; min-width: 24px; min-height: 24px; padding: 2px; }
+        QToolButton#editTaskButton:hover { background: #E2F0F4; }
+        QToolButton#removeTaskButton:hover { background: #FBE8E6; }
         QDialog { background: #FFFFFF; }
         QLabel#dialogTitle { color: #1F353E; font-size: 15px; font-weight: 600; }
         QLabel#dialogSubtitle { color: #87969C; font-size: 10px; }
