@@ -60,8 +60,8 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
     auto *header = new QHBoxLayout;
     header->setContentsMargins(0, 0, 0, 0);
     header->setSpacing(8);
-    header->addWidget(completionBox_, 0, Qt::AlignTop);
-    header->addWidget(titleLabel_, 1, Qt::AlignTop);
+    header->addWidget(completionBox_, 0, Qt::AlignVCenter);
+    header->addWidget(titleLabel_, 1, Qt::AlignVCenter);
     header->addWidget(editButton, 0, Qt::AlignTop);
     header->addWidget(removeButton, 0, Qt::AlignTop);
 
@@ -107,21 +107,31 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
     updateAppearance();
 }
 
-int TaskCard::displayHeight(const TodoTask &task)
+int TaskCard::displayHeight(const TodoTask &task, int cardWidth)
 {
-    // 入参：待显示任务。方法：按最小看板宽度累计任务与计划文本的换行高度。出参：列表项容纳完整卡片所需高度。
-    constexpr int kCardTextWidth = 255;
-    const auto textHeight = [kCardTextWidth](const QFontMetrics &metrics, const QString &text) {
-        return metrics.boundingRect(QRect(0, 0, kCardTextWidth, 0), Qt::TextWordWrap, text).height();
+    // 入参：待显示任务和当前卡片宽度。方法：按标题与计划文本的实际可用宽度累计换行高度。出参：恰好容纳卡片内容的列表项高度。
+    constexpr int kHorizontalMargins = 24;
+    constexpr int kHeaderControlsWidth = 17 + 24 + 24 + 3 * 8;
+    constexpr int kPlanControlWidth = 13 + 6;
+    const int titleWidth = qMax(120, cardWidth - kHorizontalMargins - kHeaderControlsWidth);
+    const int planWidth = qMax(120, cardWidth - kHorizontalMargins - kPlanControlWidth);
+    const auto textHeight = [](const QFontMetrics &metrics, const QString &text, int width) {
+        return metrics.boundingRect(QRect(0, 0, width, 0), Qt::TextWordWrap, text).height();
     };
     const QFontMetrics titleMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 10, QFont::DemiBold));
     const QFontMetrics planMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 9));
-    int height = 16 + qMax(17, textHeight(titleMetrics, task.title));
+    const QFontMetrics summaryMetrics(QFont(QStringLiteral("Microsoft YaHei UI"), 8));
+    int height = 16 + qMax(24, textHeight(titleMetrics, task.title, titleWidth));
     if (!task.plans.isEmpty()) {
-        height += 18;
-        for (const TodoPlan &plan : task.plans) height += 2 + qMax(13, textHeight(planMetrics, plan.title));
+        height += 8 + qMax(12, textHeight(summaryMetrics, QStringLiteral("计划 0/0 已完成"), planWidth));
+        for (int index = 0; index < task.plans.size(); ++index) {
+            if (index > 0) {
+                height += 2;
+            }
+            height += qMax(17, textHeight(planMetrics, task.plans.at(index).title, planWidth));
+        }
     }
-    return height + 16;
+    return height;
 }
 
 void TaskCard::mousePressEvent(QMouseEvent *event)

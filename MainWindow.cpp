@@ -25,6 +25,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSystemTrayIcon>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -53,6 +54,7 @@ MainWindow::MainWindow(QWidget *parent)
     createInterface();
     createTrayIcon();
     refreshTaskLists();
+    QTimer::singleShot(0, this, [this] { refreshTaskLists(); });
 }
 
 void MainWindow::createInterface()
@@ -220,7 +222,8 @@ void MainWindow::refreshTaskLists()
         const int index = quadrantIndex(task.quadrant);
         QListWidget *list = taskLists_.at(index);
         auto *item = new QListWidgetItem(list);
-        item->setSizeHint(QSize(0, TaskCard::displayHeight(task)));
+        const int cardWidth = qMax(280, list->viewport()->width());
+        item->setSizeHint(QSize(0, TaskCard::displayHeight(task, cardWidth)));
         auto *card = new TaskCard(task, list);
         list->setItemWidget(item, card);
         ++quadrantCounts.at(index);
