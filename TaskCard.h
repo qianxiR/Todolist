@@ -8,6 +8,7 @@
 class QCheckBox;
 class QLabel;
 class QMouseEvent;
+class QVBoxLayout;
 
 class TaskCard final : public QFrame {
     Q_OBJECT
@@ -22,6 +23,7 @@ signals:
 
 private:
     void updateAppearance();
+    void setPlansCompleted(bool completed);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
@@ -30,6 +32,7 @@ protected:
     TodoTask task_;
     QCheckBox *completionBox_ = nullptr;
     QLabel *titleLabel_ = nullptr;
-    QLabel *noteLabel_ = nullptr;
+    QLabel *planSummaryLabel_ = nullptr;
+    QVBoxLayout *planLayout_ = nullptr;
     QPoint dragStartPosition_;
 };

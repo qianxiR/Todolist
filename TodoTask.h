@@ -2,6 +2,7 @@
 
 #include <QJsonObject>
 #include <QString>
+#include <QVector>
 
 enum class TaskQuadrant {
     DoNow,
@@ -10,16 +11,24 @@ enum class TaskQuadrant {
     Eliminate
 };
 
+struct TodoPlan {
+    QString title;
+    bool completed = false;
+
+    QJsonObject toJson() const;
+    static TodoPlan fromJson(const QJsonObject &json);
+};
+
 struct TodoTask {
     QString id;
     QString title;
-    QString note;
+    QVector<TodoPlan> plans;
     TaskQuadrant quadrant = TaskQuadrant::DoNow;
     bool completed = false;
 
     QJsonObject toJson() const;
     static TodoTask fromJson(const QJsonObject &json);
-    static TodoTask create(const QString &title, const QString &note, TaskQuadrant quadrant);
+    static TodoTask create(const QString &title, const QVector<TodoPlan> &plans, TaskQuadrant quadrant);
 };
 
 QString quadrantTitle(TaskQuadrant quadrant);

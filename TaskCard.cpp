@@ -11,6 +11,7 @@
 #include <QMouseEvent>
 #include <QStyle>
 #include <QToolButton>
+#include <QTimer>
 #include <QVBoxLayout>
 
 TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
@@ -25,10 +26,15 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
     titleLabel_->setWordWrap(true);
     titleLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
 
-    noteLabel_ = new QLabel(this);
-    noteLabel_->setObjectName(QStringLiteral("noteLabel"));
-    noteLabel_->setWordWrap(true);
-    noteLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
+    planSummaryLabel_ = new QLabel(this);
+    planSummaryLabel_->setObjectName(QStringLiteral("planSummary"));
+    planSummaryLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
+
+    auto *plans = new QWidget(this);
+    plans->setObjectName(QStringLiteral("planList"));
+    planLayout_ = new QVBoxLayout(plans);
+    planLayout_->setContentsMargins(0, 0, 0, 0);
+    planLayout_->setSpacing(2);
 
     completionBox_ = new QCheckBox(this);
     completionBox_->setObjectName(QStringLiteral("completionBox"));
@@ -49,24 +55,30 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
 
     auto *content = new QVBoxLayout;
     content->setContentsMargins(0, 0, 0, 0);
-    content->setSpacing(3);
+    content->setSpacing(4);
     content->addWidget(titleLabel_);
-    content->addWidget(noteLabel_);
+    content->addWidget(planSummaryLabel_);
+    content->addWidget(plans);
 
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(12, 8, 8, 8);
     layout->setSpacing(10);
-    layout->addWidget(completionBox_, 0, Qt::AlignVCenter);
+    layout->addWidget(completionBox_, 0, Qt::AlignTop);
     layout->addLayout(content, 1);
     layout->addWidget(moreButton, 0, Qt::AlignTop);
 
     connect(completionBox_, &QCheckBox::toggled, this, [this](bool completed) {
         task_.completed = completed;
+        setPlansCompleted(completed);
         updateAppearance();
-        emit taskUpdated(task_);
+        QTimer::singleShot(0, this, [this] { emit taskUpdated(task_); });
     });
-    connect(editAction, &QAction::triggered, this, [this] { emit editRequested(task_); });
-    connect(removeAction, &QAction::triggered, this, [this] { emit removeRequested(task_.id); });
+    connect(editAction, &QAction::triggered, this, [this] {
+        QTimer::singleShot(0, this, [this] { emit editRequested(task_); });
+    });
+    connect(removeAction, &QAction::triggered, this, [this] {
+        QTimer::singleShot(0, this, [this] { emit removeRequested(task_.id); });
+    });
 
     updateAppearance();
 }
@@ -100,14 +112,52 @@ void TaskCard::mouseMoveEvent(QMouseEvent *event)
 
 void TaskCard::updateAppearance()
 {
-    // 入参：无。方法：依据完成状态更新标题、备注与卡片视觉状态。出参：无。
+    // 入参：无。方法：依据任务及计划完成状态重建卡片摘要与计划清单。出参：无。
     QFont titleFont = titleLabel_->font();
     titleFont.setStrikeOut(task_.completed);
     titleLabel_->setFont(titleFont);
     titleLabel_->setText(task_.title);
-    const QString note = task_.note.trimmed();
-    noteLabel_->setVisible(!note.isEmpty());
-    noteLabel_->setText(note);
+
+    while (QLayoutItem *item = planLayout_->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+
+    int completedPlans = 0;
+    for (const TodoPlan &plan : task_.plans) {
+        completedPlans += plan.completed ? 1 : 0;
+    }
+    for (int index = 0; index < task_.plans.size(); ++index) {
+        const TodoPlan &plan = task_.plans.at(index);
+
+        auto *planRow = new QWidget(this);
+        planRow->setObjectName(QStringLiteral("planRow"));
+        auto *planBox = new QCheckBox(planRow);
+        planBox->setObjectName(QStringLiteral("planCompletionBox"));
+        planBox->setChecked(plan.completed);
+        planBox->setCursor(Qt::PointingHandCursor);
+        planBox->setToolTip(plan.completed ? QStringLiteral("标记计划为待完成") : QStringLiteral("标记计划为完成"));
+        auto *planTitle = new QLabel(plan.title, planRow);
+        planTitle->setObjectName(QStringLiteral("planTitle"));
+        planTitle->setWordWrap(true);
+        planTitle->setAttribute(Qt::WA_TransparentForMouseEvents);
+        QFont planFont = planTitle->font();
+        planFont.setStrikeOut(plan.completed);
+        planTitle->setFont(planFont);
+        auto *planRowLayout = new QHBoxLayout(planRow);
+        planRowLayout->setContentsMargins(0, 0, 0, 0);
+        planRowLayout->setSpacing(6);
+        planRowLayout->addWidget(planBox, 0, Qt::AlignTop);
+        planRowLayout->addWidget(planTitle, 1);
+        connect(planBox, &QCheckBox::toggled, this, [this, index](bool completed) {
+            task_.plans[index].completed = completed;
+            updateAppearance();
+            QTimer::singleShot(0, this, [this] { emit taskUpdated(task_); });
+        });
+        planLayout_->addWidget(planRow);
+    }
+    planSummaryLabel_->setVisible(!task_.plans.isEmpty());
+    planSummaryLabel_->setText(QStringLiteral("计划 %1/%2 已完成").arg(completedPlans).arg(task_.plans.size()));
     completionBox_->blockSignals(true);
     completionBox_->setChecked(task_.completed);
     completionBox_->blockSignals(false);
@@ -115,4 +165,12 @@ void TaskCard::updateAppearance()
     setProperty("completed", task_.completed);
     style()->unpolish(this);
     style()->polish(this);
+}
+
+void TaskCard::setPlansCompleted(bool completed)
+{
+    // 入参：目标完成状态。方法：同步设置父任务下全部计划项的完成状态。出参：无。
+    for (TodoPlan &plan : task_.plans) {
+        plan.completed = completed;
+    }
 }
