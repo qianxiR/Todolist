@@ -43,6 +43,15 @@ TaskEditorDialog::TaskEditorDialog(TaskQuadrant initialQuadrant, const TodoTask 
     planRowsLayout_ = new QVBoxLayout(plansHost);
     planRowsLayout_->setContentsMargins(0, 0, 0, 0);
     planRowsLayout_->setSpacing(6);
+
+    auto *addPlanButton = new QToolButton(plansHost);
+    addPlanButton->setObjectName(QStringLiteral("addPlanButton"));
+    addPlanButton->setText(QStringLiteral("+"));
+    addPlanButton->setToolTip(QStringLiteral("添加计划项"));
+    addPlanButton->setCursor(Qt::PointingHandCursor);
+    planRowsLayout_->addWidget(addPlanButton, 0, Qt::AlignLeft);
+    connect(addPlanButton, &QToolButton::clicked, this, [this] { addPlanRow(); });
+
     const QVector<TodoPlan> existingPlans = existingTask_ == nullptr ? QVector<TodoPlan>() : existingTask_->plans;
     for (const TodoPlan &plan : existingPlans) {
         addPlanRow(plan);
@@ -57,13 +66,6 @@ TaskEditorDialog::TaskEditorDialog(TaskQuadrant initialQuadrant, const TodoTask 
     planScroll->setFrameShape(QFrame::NoFrame);
     planScroll->setWidget(plansHost);
     planScroll->setFixedHeight(132);
-
-    auto *addPlanButton = new QToolButton(this);
-    addPlanButton->setObjectName(QStringLiteral("addPlanButton"));
-    addPlanButton->setText(QStringLiteral("+"));
-    addPlanButton->setToolTip(QStringLiteral("添加计划项"));
-    addPlanButton->setCursor(Qt::PointingHandCursor);
-    connect(addPlanButton, &QToolButton::clicked, this, [this] { addPlanRow(); });
 
     quadrantBox_ = new QComboBox(this);
     for (int index = 0; index < 4; ++index) {
@@ -92,7 +94,6 @@ TaskEditorDialog::TaskEditorDialog(TaskQuadrant initialQuadrant, const TodoTask 
     form->addSpacing(4);
     form->addWidget(plansLabel);
     form->addWidget(planScroll);
-    form->addWidget(addPlanButton, 0, Qt::AlignLeft);
     form->addSpacing(4);
     form->addWidget(quadrantLabel);
     form->addWidget(quadrantBox_);
@@ -171,7 +172,7 @@ void TaskEditorDialog::addPlanRow(const TodoPlan &plan)
     layout->addWidget(completion);
     layout->addWidget(title, 1);
     layout->addWidget(removeButton);
-    planRowsLayout_->addWidget(row);
+    planRowsLayout_->insertWidget(planRows_.size(), row);
     planRows_.append(row);
 
     connect(removeButton, &QToolButton::clicked, this, [this, row] {

@@ -70,8 +70,10 @@ TaskCard::TaskCard(const TodoTask &task, QWidget *parent)
     connect(completionBox_, &QCheckBox::toggled, this, [this](bool completed) {
         task_.completed = completed;
         setPlansCompleted(completed);
-        updateAppearance();
-        QTimer::singleShot(0, this, [this] { emit taskUpdated(task_); });
+        QTimer::singleShot(0, this, [this] {
+            updateAppearance();
+            emit taskUpdated(task_);
+        });
     });
     connect(editAction, &QAction::triggered, this, [this] {
         QTimer::singleShot(0, this, [this] { emit editRequested(task_); });
@@ -151,8 +153,10 @@ void TaskCard::updateAppearance()
         planRowLayout->addWidget(planTitle, 1);
         connect(planBox, &QCheckBox::toggled, this, [this, index](bool completed) {
             task_.plans[index].completed = completed;
-            updateAppearance();
-            QTimer::singleShot(0, this, [this] { emit taskUpdated(task_); });
+            QTimer::singleShot(0, this, [this] {
+                updateAppearance();
+                emit taskUpdated(task_);
+            });
         });
         planLayout_->addWidget(planRow);
     }

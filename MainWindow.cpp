@@ -272,6 +272,7 @@ void MainWindow::openTaskEditor(TaskQuadrant initialQuadrant, const TodoTask *ex
         tasks_.append(task);
     } else {
         replaceTask(task);
+        refreshTaskLists();
         return;
     }
     saveTasks();
@@ -356,7 +357,7 @@ void MainWindow::openSettings()
 
 void MainWindow::replaceTask(const TodoTask &task)
 {
-    // 入参：带相同标识符的更新任务。方法：替换内存集合中的原任务并持久化。出参：无。
+    // 入参：带相同标识符的更新任务。方法：替换内存集合并持久化，保留当前列表视图与滚动位置。出参：无。
     const auto iterator = std::find_if(tasks_.begin(), tasks_.end(), [&task](const TodoTask &candidate) {
         return candidate.id == task.id;
     });
@@ -365,7 +366,6 @@ void MainWindow::replaceTask(const TodoTask &task)
     }
     *iterator = task;
     saveTasks();
-    refreshTaskLists();
 }
 
 void MainWindow::moveTask(const QString &taskId, TaskQuadrant targetQuadrant, int targetRow)
