@@ -59,8 +59,8 @@ void MainWindow::createInterface()
 {
     // 入参：无。方法：组织紧凑工具栏与无坐标轴的四象限任务看板。出参：无。
     setWindowTitle(QStringLiteral("Todolist"));
-    setMinimumSize(784, 490);
-    resize(1008, 630);
+    setMinimumSize(896, 560);
+    resize(1152, 720);
 
     auto *central = new QWidget(this);
     auto *root = new QVBoxLayout(central);
